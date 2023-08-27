@@ -2,23 +2,12 @@ package main
 
 import (
 	"bufio"
+	_ "errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 )
-
-// Словарь для преобразования  римских чисел в арабские
-var romanNumerals = map[string]int{
-	"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5,
-	"VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10,
-}
-
-// Словарь для преобразования арабских числел в римские
-var arabicNumerals = map[int]string{
-	1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
-	6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X",
-}
 
 // Функция для выполнения сложения
 func add(a, b int) int {
@@ -38,31 +27,81 @@ func multiply(a, b int) int {
 // Функция для выполнения деления
 func divide(a, b int) (int, error) {
 	if b == 0 {
-		return 0, fmt.Errorf("деление на ноль")
+		return 0, fmt.Errorf("деление на 0")
 	}
 	return a / b, nil
 }
 
-// Функция для преобразования римского числа в арабское
-func convertRomanToArabic(roman string) (int, error) {
-	arabic, found := romanNumerals[roman]
-	if !found {
-		return 0, fmt.Errorf("неверное римское число")
+// Функция конвертации ввода
+func convertInput(input string) (int, bool, error) {
+
+	num, err := strconv.Atoi(input)
+	if err != nil {
+		return convertRomanToArabic(input), true, nil
+	} else {
+		return num, false, nil
 	}
-	return arabic, nil
+}
+
+// Функция для преобразования римского числа в арабское
+func convertRomanToArabic(roman string) int {
+	arabic := 0
+	prevValue := 0
+
+	for i := len(roman) - 1; i >= 0; i-- {
+		currentValue := getValueOfRomanDigit(roman[i])
+
+		if currentValue < prevValue {
+			arabic -= currentValue
+		} else {
+			arabic += currentValue
+		}
+
+		prevValue = currentValue
+	}
+
+	return arabic
 }
 
 // Функция для преобразования арабского числа в римское
-func convertArabicToRoman(arabic int) (string, error) {
-	if arabic <= 0 {
-		return "", fmt.Errorf("результат не может быть отрицательным или нулевым")
+func convertArabicToRoman(arabic int) string {
+	if arabic < 1 || arabic > 3999 {
+		return "Вне диапазона"
 	}
 
-	roman, found := arabicNumerals[arabic]
-	if !found {
-		return "", fmt.Errorf("неверное арабское число")
+	roman := ""
+	values := []int{1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1}
+	symbols := []string{"M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I"}
+
+	for i := 0; i < len(values); i++ {
+		for arabic >= values[i] {
+			arabic -= values[i]
+			roman += symbols[i]
+		}
 	}
-	return roman, nil
+
+	return roman
+}
+
+// Функция для получения значения римской цифры
+func getValueOfRomanDigit(digit byte) int {
+	switch digit {
+	case 'I':
+		return 1
+	case 'V':
+		return 5
+	case 'X':
+		return 10
+	case 'L':
+		return 50
+	case 'C':
+		return 100
+	case 'D':
+		return 500
+	case 'M':
+		return 1000
+	}
+	return 0
 }
 
 // Основная функция программы main()
@@ -79,11 +118,6 @@ func main() {
 	input := scanner.Text()
 
 	parts := strings.Fields(input)
-	if len(parts) == 1 {
-		fmt.Println("Ошибка, так как строка не является математической операцией.")
-		return
-	}
-	// Разбиение введенной строки на операнды и оператор
 	if len(parts) != 3 {
 		fmt.Println("Ошибка, формат математической операции не удовлетворяет заданию — два операнда и один оператор (+, -, /, *)")
 		return
@@ -91,71 +125,60 @@ func main() {
 
 	// преобразование операндов в числа
 	var isRomanInput bool
-	a, err := strconv.Atoi(parts[0]) // Преобразование строки в число
+	a, isRomanInput, err := convertInput(parts[0])
 	if err != nil {
-		// Если не удалось преобразовать в число, попытаться преобразовать в римское число
-		romanA, convErr := convertRomanToArabic(parts[0])
-		if convErr != nil {
-			fmt.Println("Ошибка", convErr)
-			return
-		}
-		a = romanA
-		isRomanInput = true
+		fmt.Println("Ошибка конвертации первого числа:", err)
+		return
 	}
-	// Аналогично для второго операнда
-	b, err := strconv.Atoi(parts[2])
+	b, isRomanInputB, err := convertInput(parts[2])
 	if err != nil {
-		romanB, convErr := convertRomanToArabic(parts[2])
-		if convErr != nil {
-			fmt.Println("Ошибка", convErr)
-			return
-		}
-		b = romanB
-		isRomanInput = true
-	}
-	// Проверка на использование одновременно разных систем счисления
-	if (a <= 0 && b > 0) || (a > 0 && b <= 0) {
-		fmt.Println("Ошибка, используются одновременно разные системы счисления.")
+		fmt.Println("Ошибка конвертации второго числа")
 		return
 	}
 
-	//if (isRomanInput && b > 0) || (!isRomanInput && b <= 0) {
-	//	fmt.Println("Вывод ошибки:", "используются одновременно разные системы счисления.")
-	//	return
-	//}
+	// Проверка на использование одновременно разных систем счисления
 
-	// Проверка введенного оператора
+	if isRomanInput != isRomanInputB {
+		panic("Ошибка, используются одновременно разные системы счисления.")
+
+	}
+
+	// Проверка на допустимый диапазон для арабских чисел
+	if a <= 0 || a > 10 || b <= 0 || b > 10 {
+		panic("Ошибка, числа должны быть в диапазоне от 1 до 10 включительно.")
+	}
+
+	// Проверка на допустимый диапазон для римских чисел
+	if isRomanInput && (a < 1 || a > 10 || b < 1 || b > 10) {
+		fmt.Println("Ошибка, римские числа должны быть в диапазоне от I до X включительно.")
+		return
+	}
+
 	operator := parts[1]
 	if operator != "+" && operator != "-" && operator != "*" && operator != "/" {
 		fmt.Println("Ошибка, Недопустимая операция:", operator)
 		return
 	}
 
-	// Обработка случая, когда хотя бы один операнд - римское число
 	if a <= 0 {
-		// Обработка операций с римскими числами
 		if operator == "-" || operator == "*" || operator == "/" {
 			fmt.Println("Ошибка, в римской системе нет отрицательных чисел или чисел меньше единицы.")
 			return
 		}
-		// Выполнение операции и вывод результата в римских числах
-		result, convErr := convertArabicToRoman(add(a, b))
-		if convErr != nil {
-			fmt.Println("Ошибка при конвертации результата в римские числа", convErr)
+		result := convertArabicToRoman(add(a, b))
+		if err != nil {
+			fmt.Println("Ошибка конвертации результата")
 			return
 		}
-		fmt.Println(result)
+		fmt.Println("Вывод:", result)
 	} else {
-		// Обработка арабских чисел
 		switch operator {
 		case "+":
 			result := add(a, b)
-
-			// Вывод результата в римских числах, если ввод был в этой системе
 			if isRomanInput {
-				resultRoman, convErr := convertArabicToRoman(result)
-				if convErr != nil {
-					fmt.Println("Ошибка, при конвертации результата в римские числа:", convErr)
+				resultRoman := convertArabicToRoman(result)
+				if err != nil {
+					fmt.Println("Ошибка конвертации результата")
 					return
 				}
 				fmt.Println("Вывод:", resultRoman)
@@ -165,16 +188,11 @@ func main() {
 		case "-":
 			result := subtract(a, b)
 			if isRomanInput {
-				// Обработка результата и вывод в римских числах
 				if result <= 0 {
-					fmt.Println("Ошибка", "В римской системе нет отрицательных чисел.")
+					fmt.Println("Ошибка, в римской системе нет отрицательных чисел.")
 					return
 				}
-				resultRoman, convErr := convertArabicToRoman(result)
-				if convErr != nil {
-					fmt.Println("Ошибка при конвертации результата в римские числа", convErr)
-					return
-				}
+				resultRoman := convertArabicToRoman(result)
 				fmt.Println("Вывод:", resultRoman)
 			} else {
 				fmt.Println("Вывод:", result)
@@ -182,9 +200,9 @@ func main() {
 		case "*":
 			result := multiply(a, b)
 			if isRomanInput {
-				resultRoman, convErr := convertArabicToRoman(result)
-				if convErr != nil {
-					fmt.Println("Ошибка при конвертации результата в римские числа", convErr)
+				resultRoman := convertArabicToRoman(result)
+				if err != nil {
+					fmt.Println("Ошибка конвертации результата")
 					return
 				}
 				fmt.Println("Вывод:", resultRoman)
@@ -192,21 +210,39 @@ func main() {
 				fmt.Println("Вывод:", result)
 			}
 		case "/":
-			result, err := divide(a, b)
-			if err != nil {
-				fmt.Println("Ошибка", err)
+			if b == 0 {
+				fmt.Println("Ошибка, деление на ноль")
 				return
 			}
+
+			result, err := divide(a, b)
+			if err != nil {
+				fmt.Println("Ошибка при делении:", err)
+				return
+			}
+
 			if isRomanInput {
-				resultRoman, convErr := convertArabicToRoman(result)
-				if convErr != nil {
-					fmt.Println("Ошибка при конвертации результата в римские числа", convErr)
+
+				if result <= 0 {
+					fmt.Println("в римской системе нет отрицательных чисел")
+					return
+				}
+
+				if result == 0 {
+					fmt.Println("в римской системе нет нуля")
+					return
+				}
+
+				resultRoman := convertArabicToRoman(result)
+				if err != nil {
+					fmt.Println("Ошибка конвертации результата")
 					return
 				}
 				fmt.Println("Вывод:", resultRoman)
 			} else {
 				fmt.Println("Вывод:", result)
 			}
+
 		}
 	}
 }
